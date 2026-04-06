@@ -1,5 +1,7 @@
 # Rules — условия запуска pipeline и jobs
 
+[Вернуться](./README.md)
+
 rules определяют:
 
 - запускать job или нет

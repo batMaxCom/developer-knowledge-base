@@ -1,5 +1,18 @@
 # Как устроен GitLab CI/CD
 
+## Структура документации
+
+- [Структура проекта](./stucture.md)
+- [Stages и Jobs](./stages_jobs.md)
+- [Runner](./runner.md)
+- [Rules](./rules.md)
+- [Переменные окружения](./environment.md)
+- [Docker в GitLab CI/CD](./docker.md)
+- [BuildKit](./buildkit.md)
+- [Cache, Artifacts, Dependencies](./cache_artifacts_dependencies.md)
+- [Deploy](./deploy.md)
+- [Базовый пример](./example/README.md)
+
 Пример потока
 ```
 git push → pipeline → stages → jobs → runner → результат
@@ -84,3 +97,4 @@ image: python:3.12
 Это не просто последовательность
 Можно делать параллельные jobs, зависимости (needs)
 ```
+

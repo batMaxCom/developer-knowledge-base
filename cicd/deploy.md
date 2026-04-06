@@ -1,5 +1,7 @@
 # Deploy
 
+[Вернуться](./README.md)
+
 Стратегия:
 ```yaml
 test → build image → push image → deploy to staging → verify → deploy to production

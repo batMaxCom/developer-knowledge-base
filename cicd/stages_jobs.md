@@ -1,5 +1,7 @@
 # Stages - линейный порядок этапов
 
+[Вернуться](./README.md)
+
 ```yaml
 stages:
   - lint

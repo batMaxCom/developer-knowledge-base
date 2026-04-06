@@ -1,4 +1,4 @@
-## .gitlab-ci.yml
+# .gitlab-ci.yml
 
 Является главным орекстратором.
 
@@ -102,3 +102,117 @@ pipeline не создаётся.
 Необходимо для разделения кода. 
 
 `.gitlab-ci.yml` не разрастается, а логика раскладывается по отдельным stage-файлам.
+
+# .lint.gitlab-ci.yml
+
+Отвечает за статическую проверку Python-кода. Прекращает выполнение pipeline, если есть ошибки.
+
+Обычно запускают:
+- ruff
+- flake8
+- black --check
+- mypy
+
+Иногда - pytest, но чаще отдельным job-ом.
+
+## variables
+
+Локальные переменные, которые используются только в этом job. Могут переопределить глобальные.
+
+Пример:
+```yaml
+variables:
+  WORKING_DIR: "src/"
+  UV_VERSION: "0.11.1"
+  PYTHON_VERSION: "3.12"
+  BASE_LAYER: "alpine"
+  UV_CACHE_DIR: ".uv_cache"
+```
+
+## stage
+Явно указываем, что эта job относится к этапу(stage) `lint`
+
+```yaml
+stage: lint
+```
+
+## tags
+
+Говорит о том, что эту job нужно отправлять только на runner, у которого есть тег `formatter`.
+
+## image
+```yaml
+image: ghcr.io/astral-sh/uv:$UV_VERSION-python$PYTHON_VERSION-$BASE_LAYER
+```
+Контейнер, внутри которого job будет исполняться.
+
+## script
+
+Это основная логика job.
+
+```yaml
+script:
+  - |
+    uv sync --all-groups --frozen --no-editable
+    echo "🧹 Запуск Ruff..."
+    uv run ruff check --diff --config .ruff.toml .
+    echo "🔍 Запуск MyPy..."
+    uv run mypy --config-file .mypy.ini --exclude build .
+    echo "🏁 Завершено линтинг UV (Ruff + MyPy) для ${WORKING_DIR}"
+```
+
+Что происходит:
+- uv sync устанавливает зависимости проекта в окружение.
+- запускает Ruff внутри окружения, созданного uv.
+- MyPy проверяет типизацию Python-кода.
+
+## after_script
+Команды, которые выполнятся после script, даже если основной script упал.
+```yaml
+after_script:
+  - uv cache prune --ci || true
+```
+Чистит кэш uv, оставляя только то, что полезно для CI.
+
+`|| true` - если команда очистки по какой-то причине завершится с ошибкой, job всё равно не упадёт.
+
+Необходимо, так как не критичная часть проверки кода.
+
+## cache
+```yaml
+cache:
+  key: # ключ кэша строится на основе файла
+    files:
+      - uv.lock
+  paths: # кэширование директорий
+    - .venv/
+    - $UV_CACHE_DIR/
+  policy: pull-push # сначала попытаться скачать существующий cache, после успешного выполнения обновить его
+  when: on_success # Сохранять кэш только если job завершился успешно.
+  untracked: false # Не включать в cache все неотслеживаемые файлы подряд.
+```
+
+## retry
+
+Инструкция перезапуска job.
+
+```yaml
+retry:
+  max: 2
+  when:
+    - runner_system_failure
+    - stuck_or_timeout_failure
+```
+
+## rules
+
+Условия, при которых должна срабатывать job.
+
+```yaml
+rules:
+  - if: '$CI_COMMIT_BRANCH == "main" || $CI_PIPELINE_SOURCE == "merge_request_event"' # это ветка main или это pipeline Merge Request
+    changes:
+      - src/**/* # Изменения в основной директории
+      - Dockerfile # Изменения в Dockerfile 
+    when: always # Если правило совпало, job нужно запускать.
+```

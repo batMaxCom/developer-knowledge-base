@@ -172,3 +172,52 @@ stmt = (
 
 rows = connection.execute(stmt).all()
 ```
+
+## Создание индексов
+
+SQLAlchemy позволяет создать индекс прямо из Core.
+
+Пример:
+from sqlalchemy import Index
+```python
+index_users_name = Index("ix_users_name", users.c.name)
+index_users_name.create(engine)
+```
+Удалить индекс:
+```python
+index_users_name.drop(engine)
+```
+## Constraints (ограничения)
+- UNIQUE
+```python
+from sqlalchemy import UniqueConstraint
+
+users = Table(
+    "users",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("email", String),
+    UniqueConstraint("email")
+)
+```
+- CHECK
+```python
+from sqlalchemy import CheckConstraint
+
+orders = Table(
+    "orders",
+    metadata,
+    Column("price", Integer),
+    CheckConstraint("price > 0")
+)
+```
+- FOREIGN KEY
+```
+from sqlalchemy import ForeignKey
+
+orders = Table(
+    "orders",
+    metadata,
+    Column("user_id", Integer, ForeignKey("users.id"))
+)
+```

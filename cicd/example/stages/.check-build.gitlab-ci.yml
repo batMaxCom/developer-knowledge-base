@@ -1,0 +1,54 @@
+.check-build-template:
+  needs:
+    - job: lint
+      optional: false
+
+  image:
+    name: moby/buildkit:v0.23.2-rootless
+    entrypoint: [ "" ]
+
+  variables:
+    BUILDKITD_FLAGS: "--oci-worker-no-process-sandbox"
+    DOCKER_BUILDKIT: "1"
+    BUILDKIT_PROGRESS: "plain"
+
+  stage: check-build
+  tags:
+    - build
+  before_script:
+    - |
+      echo "🔧 Проверка BuildKit..."
+      buildctl --version
+      echo "✅ BuildKit готов к работе"
+
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - src/monitoring/**/*
+      when: on_success
+
+
+check-build-web:
+  extends: .check-build-template
+  variables:
+    APP_NAME: "monitoring-web"
+    NAME_CACHE: "${APP_NAME}-cache"
+    TARGET: "web-runtime"
+  script:
+    - |
+      echo "🔍 Проверка сборки образа приложения - ${TARGET}..."
+      buildctl-daemonless.sh build \
+        --frontend dockerfile.v0 \
+        --opt target="${TARGET}" \
+        --local context=./ \
+        --local dockerfile=./ \
+        --import-cache type=s3,endpoint_url=${MINIO_ENDPOINT},bucket=${MINIO_BUCKET},region=us-east-1,use_path_style=true,access_key_id=${MINIO_ACCESS_KEY},secret_access_key=${MINIO_SECRET_KEY},name=${NAME_CACHE} \
+        --export-cache type=s3,endpoint_url=${MINIO_ENDPOINT},bucket=${MINIO_BUCKET},region=us-east-1,use_path_style=true,access_key_id=${MINIO_ACCESS_KEY},secret_access_key=${MINIO_SECRET_KEY},name=${NAME_CACHE},mode=max \
+        --output type=image,push=false,name=dummy:latest
+      echo "✅ Сборка ${APP_NAME} образа проверена успешно!"

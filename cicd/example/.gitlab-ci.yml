@@ -1,0 +1,32 @@
+stages:
+  - lint
+  - check-build
+  - semantic-release
+  - build
+  - trigger-deploy
+
+variables:
+  PYTHON_VERSION: "${PYTHON_VERSION:-3.12}"
+  UV_VERSION: "${UV_VERSION:-0.8.0}"
+  BUILDCIT_ROOTLES_VERSION: "${BUILDKIT_ROOTLESS_VERSION:-0.23.2}"
+
+workflow:
+  rules:
+    # Коммит выполненный в ветке main
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    # Пуш с тегом в ветке main
+    - if: '$CI_COMMIT_TAG'
+    # Pipeline в контексте MR
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    # Если контекст commit-а, но есть открытый MR, то НЕ запускаемся
+    - if: '$CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS'
+      when: never
+    - when: never
+
+
+include:
+  - local: "/.gitlab/stages/.lint.gitlab-ci.yml"
+  - local: "/.gitlab/stages/.check-build.gitlab-ci.yml"
+  - local: "/.gitlab/stages/.semantic-release.gitlab-ci.yml"
+  - local: "/.gitlab/stages/.build.gitlab-ci.yml"
+  - local: "/.gitlab/stages/.trigger-deploy.gitlab-ci.yml"

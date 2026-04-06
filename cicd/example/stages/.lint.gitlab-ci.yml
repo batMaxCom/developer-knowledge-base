@@ -1,0 +1,54 @@
+lint:
+  variables:
+    WORKING_DIR: "src/monitoring"
+    UV_VERSION: "0.11.1"
+    PYTHON_VERSION: "3.12"
+    BASE_LAYER: "alpine"
+    UV_CACHE_DIR: ".uv_cache"
+    UV_HTTP_TIMEOUT: "120"
+    UV_HTTP_RETRIES: "5"
+
+  stage: lint
+
+  tags:
+    - formatter
+
+  image: ghcr.io/astral-sh/uv:$UV_VERSION-python$PYTHON_VERSION-$BASE_LAYER
+
+  script:
+    - |
+      export UV_HTTP_TIMEOUT=120
+      export UV_HTTP_RETRIES=5
+      uv sync --all-groups --frozen --no-editable
+      echo "🧹 Запуск Ruff..."
+      uv run ruff check --diff --config .ruff.toml .
+      echo "🔍 Запуск MyPy..."
+      uv run mypy --config-file .mypy.ini --exclude build .
+      echo "🏁 Завершено линтинг UV (Ruff + MyPy) для ${WORKING_DIR}"
+
+  after_script:
+    - uv cache prune --ci || true
+
+  cache:
+    key:
+      files:
+        - uv.lock
+    paths:
+      - .venv/
+      - $UV_CACHE_DIR/
+    policy: pull-push
+    when: on_success
+    untracked: false
+
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - src/monitoring/**/*
+        - Dockerfile
+      when: always

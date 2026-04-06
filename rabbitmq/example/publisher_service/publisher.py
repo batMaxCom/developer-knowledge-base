@@ -53,7 +53,7 @@ class RabbitMQProducer:
                 )
                 self.channel = await self.connection.channel()
                 self.exchange = await self.channel.declare_exchange(
-                    exchange_map.get(self.exchange_type),
+                    "core", # exchange_map.get(self.exchange_type),
                     self.exchange_type,
                     durable=True,
                     auto_delete=False,
@@ -159,7 +159,7 @@ class RabbitMQProducer:
         try:
             # Создаем сообщение
             message = Message(
-                body=json.dumps(event, default=self.json_serializer).encode(),
+                body=json.dumps(json.loads(event), default=self.json_serializer).encode(),
                 correlation_id=correlation_id,
                 reply_to=self.callback_queue.name,
                 content_type="application/json",

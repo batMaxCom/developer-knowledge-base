@@ -1,0 +1,55 @@
+.build-template:
+
+  image:
+    name: moby/buildkit:v0.23.2-rootless
+    entrypoint: [ "" ]
+
+  variables:
+    BUILDKITD_FLAGS: "--oci-worker-no-process-sandbox"
+    BUILDKIT_INLINE_CACHE: "1"
+    DOCKER_BUILDKIT: "1"
+    BUILDKIT_PROGRESS: "plain"
+    DOCKER_AUTH_CONFIG: "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}"
+
+  stage: build
+  tags:
+    - build
+
+  before_script:
+    - |
+      echo "🔧 Проверка BuildKit..."
+      buildctl --version
+      echo "✅ BuildKit готов к работе"
+      echo "🔑 Логин в GitLab Registry..."
+      mkdir -p ~/.docker
+      echo "${DOCKER_AUTH_CONFIG}" > ~/.docker/config.json
+
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+
+  rules:
+    - if: '$CI_COMMIT_TAG'
+      when: always
+
+build-web:
+  extends: .build-template
+  variables:
+    APP_NAME: "monitoring-web"
+    NAME_CACHE: "${APP_NAME}-cache"
+    APP_IMAGE: "${CI_REGISTRY_IMAGE}/${APP_NAME}:${CI_COMMIT_TAG}"
+    TARGET: "web-runtime"
+  script:
+    - |
+      echo "🏗️ Сборка и отправка образа приложения - ${TARGET}..."
+      buildctl-daemonless.sh build \
+        --frontend dockerfile.v0 \
+        --opt target="${TARGET}" \
+        --local context=./ \
+        --local dockerfile=./ \
+        --import-cache type=s3,endpoint_url=${MINIO_ENDPOINT},bucket=${MINIO_BUCKET},region=us-east-1,use_path_style=true,access_key_id=${MINIO_ACCESS_KEY},secret_access_key=${MINIO_SECRET_KEY},name=${NAME_CACHE} \
+        --export-cache type=s3,endpoint_url=${MINIO_ENDPOINT},bucket=${MINIO_BUCKET},region=us-east-1,use_path_style=true,access_key_id=${MINIO_ACCESS_KEY},secret_access_key=${MINIO_SECRET_KEY},name=${NAME_CACHE},mode=max \
+        --output type=image,name="${APP_IMAGE}",push=true
+      echo "✅ Образ ${APP_NAME} успешно собран и отправлен"

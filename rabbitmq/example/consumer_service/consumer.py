@@ -51,14 +51,14 @@ class RabbitMQConsumer:
                 )
                 self.channel = await self.connection.channel()  # Создание канала для взаимодействия с RabbitMQ
                 self.exchange = await self.channel.declare_exchange(
-                    exchange_map.get(self.exchange_type),
+                    "monitoring", # exchange_map.get(self.exchange_type),
                     self.exchange_type,
                     durable=True,  # Сохранение exchange при перезагрузке RabbitMQ
                     auto_delete=False,  # Не удалять exchange при отсутствии подписчиков
                 )
                 # обрабатываем
                 self.request_queue = await self.channel.declare_queue(
-                    exchange_map.get(self.exchange_type).replace("exchange", "queue"),
+                    "monitoring_event", # exchange_map.get(self.exchange_type).replace("exchange", "queue"),
                     auto_delete=True,
                     durable=False,
                     arguments={  # Дополнительные аргументы очереди
@@ -116,8 +116,9 @@ class RabbitMQConsumer:
                 correlation_id = message.correlation_id
                 # Получение ключа маршрутизации сообщения
                 if not reply_to:
-                    logging.error("No 'reply_to' in message. Cannot send response.")
-                    return
+                    reply_to = None
+                    # logging.error("No 'reply_to' in message. Cannot send response.")
+                    # return
                 # Обработка сообщения (вызов метода обработки)
                 result = await self._process_message(message)
                 # Если очередь слушает по паттерну "response.*" отправляем туда
